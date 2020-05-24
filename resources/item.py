@@ -12,12 +12,12 @@ class Item(Resource):
                         help="This field cannot be blank!"
                         )
 
-    #@jwt_required()
+    @jwt_required()
     def get(self, name):
         item = ItemModel.find_by_name(name)
         if item:
             return item.json()
-        return {'message': 'Item not found'}, 404
+        return {'message': f"Item '{name}' not found"}, 404
 
     def post(self, name):
         if ItemModel.find_by_name(name):
@@ -28,33 +28,37 @@ class Item(Resource):
         item = ItemModel(name, data['price'])
 
         try:
-            item.insert()
+            item.upsert()
         except:
             return {'message': 'An error occurred.'}, 500
 
         return item.json(), 201
 
     def delete(self, name):
-        if ItemModel.delete_item(name):
+        item = ItemModel.find_by_name(name)
+        if item:
+            item.delete()
             return {'message': 'Item deleted: ' + name}
-        return {'message': 'Item not deleted'}
+        else:
+            return {'message': f"Item '{name}' not found!"}, 404
 
     def put(self, name):
         data = Item.parser.parse_args()
-        existing_item = ItemModel.find_by_name(name)
-        updated_item = ItemModel(name, data['price'])
+        item = ItemModel.find_by_name(name)
 
-        if existing_item:
+        if item:
             try:
-                updated_item.update()
+                item.price = data['price']
+                item.upsert()
             except:
-                return {'message': 'An error occurred updating item.'}, 500
+                return {'message': 'An error occurred updating item: ' + name}, 500
         else:
             try:
-                updated_item.insert()
+                item = ItemModel(name, data['price'])
+                item.upsert()
             except:
-                return {'message': 'An error occurred inserting item.'}, 500
-        return updated_item.json()
+                return {'message': 'An error occurred inserting item: ' + name}, 500
+        return item.json()
 
 
 class ItemList(Resource):
@@ -67,7 +71,7 @@ class ItemList(Resource):
         results = cursor.execute(query)
         items = []
         for row in results:
-            items.append({'name': row[0], 'price': row[1]})
+            items.append({'id': row[0], 'name': row[1], 'price': row[2]})
         connection.close()
         if items:
             return {'items': items}, 200
