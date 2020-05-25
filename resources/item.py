@@ -54,6 +54,7 @@ class Item(Resource):
         if item:
             try:
                 item.price = data['price']
+                item.store_id = data['store_id']
                 item.upsert()
             except:
                 return {'message': 'An error occurred updating item: ' + name}, 500
